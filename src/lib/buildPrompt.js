@@ -4,11 +4,14 @@ const LENGTH_GUIDANCE = {
   detailed: 'Write a DETAILED post: cover every included region/day thoroughly, using the analysis text as the basis but written in your own natural voice, with clear structure per area. Do not omit meaningful detail from the source analysis.',
 };
 
-function formatItemSection(typeLabel, item, selectedRegionIds, selectedDayIds) {
+function formatItemSection(typeLabel, item, sel) {
+  const { regionIds: selectedRegionIds = [], dayIds: selectedDayIds = [], includeOverview, includeExtended } = sel;
   const lines = [`### ${typeLabel}`];
   if (item.title) lines.push(`Title: ${item.title}`);
-  if (item.headline) lines.push(`Headline: ${item.headline}`);
+  if (item.headline && item.headline !== item.overview) lines.push(`Headline: ${item.headline}`);
   if (item.issuedAt) lines.push(`Issued: ${item.issuedAt}`);
+  if (includeOverview && item.overview) lines.push(`Short-term overview: ${item.overview}`);
+  if (includeExtended && item.extendedOutlook) lines.push(`Extended outlook: ${item.extendedOutlook}`);
 
   const regions = item.regions.filter((r) => selectedRegionIds.includes(r.id));
   if (regions.length) {
@@ -17,6 +20,7 @@ function formatItemSection(typeLabel, item, selectedRegionIds, selectedDayIds) {
       lines.push(`- Area: ${r.area}`);
       if (r.timeframe) lines.push(`  Timeframe: ${r.timeframe}`);
       if (r.analysis) lines.push(`  Analysis: ${r.analysis}`);
+      if (r.extraDetail) lines.push(`  Additional detail: ${r.extraDetail}`);
     }
   }
 
@@ -40,9 +44,7 @@ function formatItemSection(typeLabel, item, selectedRegionIds, selectedDayIds) {
 export function buildPrompts({ selections, contentTypeLabels, style, extraInstructions }) {
   const sections = Object.entries(selections)
     .filter(([, sel]) => sel && sel.item)
-    .map(([key, sel]) =>
-      formatItemSection(contentTypeLabels[key] || key, sel.item, sel.regionIds || [], sel.dayIds || [])
-    );
+    .map(([key, sel]) => formatItemSection(contentTypeLabels[key] || key, sel.item, sel));
 
   const systemPrompt = `You are the social media writer for South Island Met, a New Zealand regional weather Facebook page (facebook.com/southislandmet). You turn structured forecast data from internal forecast consoles into a single ready-to-publish Facebook post.
 

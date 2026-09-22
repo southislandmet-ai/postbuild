@@ -65,8 +65,10 @@ export default function App() {
               ...sel,
               [type.key]: {
                 itemId: first.id,
-                regionIds: first.regions.map((r) => r.id),
+                regionIds: first.regions.filter((r) => r.active).map((r) => r.id),
                 dayIds: first.days.map((d) => d.id),
+                includeOverview: !!first.overview,
+                includeExtended: !!first.extendedOutlook,
               },
             };
           });
@@ -92,7 +94,13 @@ export default function App() {
       const sel = selections[type.key];
       const item = liveData[type.key]?.items.find((i) => i.id === sel?.itemId);
       if (!item) continue;
-      out[type.key] = { item, regionIds: sel.regionIds || [], dayIds: sel.dayIds || [] };
+      out[type.key] = {
+        item,
+        regionIds: sel.regionIds || [],
+        dayIds: sel.dayIds || [],
+        includeOverview: !!sel.includeOverview,
+        includeExtended: !!sel.includeExtended,
+      };
     }
     return out;
   }, [enabledTypes, selections, liveData]);
@@ -100,7 +108,11 @@ export default function App() {
   const canGenerate = useMemo(
     () =>
       Object.values(activeSelections).some(
-        (sel) => (sel.regionIds && sel.regionIds.length) || (sel.dayIds && sel.dayIds.length)
+        (sel) =>
+          (sel.regionIds && sel.regionIds.length) ||
+          (sel.dayIds && sel.dayIds.length) ||
+          sel.includeOverview ||
+          sel.includeExtended
       ),
     [activeSelections]
   );

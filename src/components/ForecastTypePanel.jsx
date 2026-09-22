@@ -26,8 +26,10 @@ export default function ForecastTypePanel({
     const item = items.find((i) => i.id === itemId);
     onChangeSelection({
       itemId,
-      regionIds: item ? item.regions.map((r) => r.id) : [],
+      regionIds: item ? item.regions.filter((r) => r.active).map((r) => r.id) : [],
       dayIds: item ? item.days.map((d) => d.id) : [],
+      includeOverview: !!item?.overview,
+      includeExtended: !!item?.extendedOutlook,
     });
   }
 
@@ -80,6 +82,37 @@ export default function ForecastTypePanel({
             <p className="item-headline">{selectedItem.title || selectedItem.headline}</p>
           )}
 
+          {(selectedItem?.overview || selectedItem?.extendedOutlook) && (
+            <div className="region-picker">
+              {selectedItem.overview && (
+                <label className="check-row">
+                  <input
+                    type="checkbox"
+                    checked={!!selection?.includeOverview}
+                    onChange={(e) => onChangeSelection({ ...selection, includeOverview: e.target.checked })}
+                  />
+                  <span>
+                    <strong>Short-term overview</strong>
+                    <div className="check-row-detail">{selectedItem.overview}</div>
+                  </span>
+                </label>
+              )}
+              {selectedItem.extendedOutlook && (
+                <label className="check-row">
+                  <input
+                    type="checkbox"
+                    checked={!!selection?.includeExtended}
+                    onChange={(e) => onChangeSelection({ ...selection, includeExtended: e.target.checked })}
+                  />
+                  <span>
+                    <strong>Extended outlook</strong>
+                    <div className="check-row-detail">{selectedItem.extendedOutlook}</div>
+                  </span>
+                </label>
+              )}
+            </div>
+          )}
+
           {selectedItem?.regions?.length > 0 && (
             <div className="region-picker">
               <div className="region-picker-header">
@@ -103,7 +136,9 @@ export default function ForecastTypePanel({
                   <span>
                     <strong>{r.area}</strong>
                     {r.timeframe && <em> — {r.timeframe}</em>}
+                    {!r.active && <em className="inactive-tag"> (inactive)</em>}
                     {r.analysis && <div className="check-row-detail">{r.analysis}</div>}
+                    {r.extraDetail && <div className="check-row-detail check-row-extra">{r.extraDetail}</div>}
                   </span>
                 </label>
               ))}
