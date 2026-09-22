@@ -139,6 +139,8 @@ export default function App() {
         dayIds: sel.dayIds || [],
         includeOverview: !!sel.includeOverview,
         includeExtended: !!sel.includeExtended,
+        includeTimeframe: sel.includeTimeframe !== false,
+        includeExtraDetail: sel.includeExtraDetail !== false,
       };
     }
     return out;

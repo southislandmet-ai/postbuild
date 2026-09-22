@@ -191,6 +191,18 @@ body {
   margin-top: 12px;
 }
 
+.detail-toggles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 18px;
+  margin-bottom: 8px;
+  font-size: 0.85rem;
+}
+
+.detail-toggles .checkbox-field {
+  margin: 0;
+}
+
 .region-picker-header {
   display: flex;
   justify-content: space-between;

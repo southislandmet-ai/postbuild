@@ -138,6 +138,28 @@ export default function ForecastTypePanel({
                   </button>
                 </span>
               </div>
+
+              <div className="detail-toggles">
+                <label className="checkbox-field">
+                  <input
+                    type="checkbox"
+                    checked={selection?.includeTimeframe !== false}
+                    onChange={(e) => onChangeSelection({ ...selection, includeTimeframe: e.target.checked })}
+                  />
+                  <span>Include timeframe</span>
+                </label>
+                {selectedItem.regions.some((r) => r.extraDetail) && (
+                  <label className="checkbox-field">
+                    <input
+                      type="checkbox"
+                      checked={selection?.includeExtraDetail !== false}
+                      onChange={(e) => onChangeSelection({ ...selection, includeExtraDetail: e.target.checked })}
+                    />
+                    <span>Include technical detail (freezing level, snow bands, etc.)</span>
+                  </label>
+                )}
+              </div>
+
               {selectedItem.regions.map((r) => (
                 <label key={r.id} className="check-row">
                   <input
@@ -147,10 +169,12 @@ export default function ForecastTypePanel({
                   />
                   <span>
                     <strong>{r.area}</strong>
-                    {r.timeframe && <em> — {r.timeframe}</em>}
+                    {r.timeframe && selection?.includeTimeframe !== false && <em> — {r.timeframe}</em>}
                     {!r.active && <em className="inactive-tag"> (inactive)</em>}
                     {r.analysis && <div className="check-row-detail">{r.analysis}</div>}
-                    {r.extraDetail && <div className="check-row-detail check-row-extra">{r.extraDetail}</div>}
+                    {r.extraDetail && selection?.includeExtraDetail !== false && (
+                      <div className="check-row-detail check-row-extra">{r.extraDetail}</div>
+                    )}
                   </span>
                 </label>
               ))}

@@ -5,7 +5,14 @@ const LENGTH_GUIDANCE = {
 };
 
 function formatItemSection(typeLabel, item, sel) {
-  const { regionIds: selectedRegionIds = [], dayIds: selectedDayIds = [], includeOverview, includeExtended } = sel;
+  const {
+    regionIds: selectedRegionIds = [],
+    dayIds: selectedDayIds = [],
+    includeOverview,
+    includeExtended,
+    includeTimeframe = true,
+    includeExtraDetail = true,
+  } = sel;
   const lines = [`### ${typeLabel}`];
   if (item.title) lines.push(`Title: ${item.title}`);
   if (item.headline && item.headline !== item.overview) lines.push(`Headline: ${item.headline}`);
@@ -18,9 +25,9 @@ function formatItemSection(typeLabel, item, sel) {
     lines.push('Regional breakdown:');
     for (const r of regions) {
       lines.push(`- Area: ${r.area}`);
-      if (r.timeframe) lines.push(`  Timeframe: ${r.timeframe}`);
+      if (includeTimeframe && r.timeframe) lines.push(`  Timeframe: ${r.timeframe}`);
       if (r.analysis) lines.push(`  Analysis: ${r.analysis}`);
-      if (r.extraDetail) lines.push(`  Additional detail: ${r.extraDetail}`);
+      if (includeExtraDetail && r.extraDetail) lines.push(`  Additional detail: ${r.extraDetail}`);
     }
   }
 
