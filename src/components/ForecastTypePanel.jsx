@@ -1,9 +1,10 @@
 function StatusBadge({ status }) {
   const map = {
-    loading: { label: 'Connecting…', cls: 'badge-loading' },
+    loading: { label: 'Fetching…', cls: 'badge-loading' },
     ok: { label: 'Live', cls: 'badge-ok' },
     empty: { label: 'No active forecast', cls: 'badge-empty' },
     error: { label: 'Connection error', cls: 'badge-error' },
+    idle: { label: 'Not fetched yet', cls: 'badge-empty' },
   };
   const info = map[status] || map.loading;
   return <span className={`badge ${info.cls}`}>{info.label}</span>;
@@ -11,11 +12,14 @@ function StatusBadge({ status }) {
 
 export default function ForecastTypePanel({
   type,
+  sourceMode,
   liveState,
   enabled,
   onToggleEnabled,
   selection,
   onChangeSelection,
+  onRefresh,
+  refreshing,
 }) {
   const items = liveState.items || [];
   const selectedItem = items.find((i) => i.id === selection?.itemId) || items[0] || null;
@@ -61,6 +65,14 @@ export default function ForecastTypePanel({
         <StatusBadge status={liveState.status} />
       </div>
       <p className="panel-blurb">{type.blurb}</p>
+
+      {enabled && sourceMode === 'website' && (
+        <div className="website-refresh-row">
+          <button className="btn" onClick={onRefresh} disabled={refreshing}>
+            {refreshing ? 'Fetching from website…' : 'Refresh from website'}
+          </button>
+        </div>
+      )}
 
       {enabled && liveState.status === 'ok' && (
         <div className="panel-body">
@@ -182,8 +194,15 @@ export default function ForecastTypePanel({
         </div>
       )}
 
+      {enabled && liveState.status === 'idle' && (
+        <p className="hint">Click "Refresh from website" to fetch the current {type.label} page.</p>
+      )}
+
       {enabled && liveState.status === 'empty' && (
-        <p className="hint">No active {type.label} forecast is currently live in Firebase.</p>
+        <p className="hint">
+          No active {type.label} content found{' '}
+          {sourceMode === 'website' ? 'on the page right now' : 'currently live in Firebase'}.
+        </p>
       )}
 
       {enabled && liveState.status === 'error' && (

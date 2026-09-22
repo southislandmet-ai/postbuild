@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { watchPath } from './lib/firebase';
 import { normalizeSnapshot } from './lib/normalize';
 import { CONTENT_TYPES, loadSettings, saveSettings } from './lib/settings';
 import { buildPrompts } from './lib/buildPrompt';
 import { generatePost } from './lib/claude';
+import { extractForecastFromUrl } from './lib/webExtract';
 import SettingsModal from './components/SettingsModal';
 import DiagnosticsPanel from './components/DiagnosticsPanel';
 import ForecastTypePanel from './components/ForecastTypePanel';
@@ -16,7 +17,12 @@ export default function App() {
   const [showSettings, setShowSettings] = useState(false);
 
   const [liveData, setLiveData] = useState(() =>
-    Object.fromEntries(CONTENT_TYPES.map((t) => [t.key, { status: 'loading', items: [] }]))
+    Object.fromEntries(
+      CONTENT_TYPES.map((t) => [
+        t.key,
+        { status: settings.sourceModes[t.key] === 'website' ? 'idle' : 'loading', items: [] },
+      ])
+    )
   );
   const [enabledTypes, setEnabledTypes] = useState({});
   const [selections, setSelections] = useState({});
@@ -27,6 +33,56 @@ export default function App() {
   const [genError, setGenError] = useState('');
   const [rootKeys, setRootKeys] = useState(null);
   const [rootError, setRootError] = useState('');
+  const [refreshing, setRefreshing] = useState({});
+
+  const applyItems = useCallback((typeKey, items, raw) => {
+    setLiveData((d) => ({
+      ...d,
+      [typeKey]: { status: items.length ? 'ok' : 'empty', items, raw },
+    }));
+    setSelections((sel) => {
+      if (sel[typeKey]?.itemId && items.some((i) => i.id === sel[typeKey].itemId)) return sel;
+      const first = items[0];
+      if (!first) return sel;
+      return {
+        ...sel,
+        [typeKey]: {
+          itemId: first.id,
+          regionIds: first.regions.filter((r) => r.active).map((r) => r.id),
+          dayIds: first.days.map((d) => d.id),
+          includeOverview: !!first.overview,
+          includeExtended: !!first.extendedOutlook,
+        },
+      };
+    });
+  }, []);
+
+  const refreshFromWebsite = useCallback(
+    async (typeKey) => {
+      const type = CONTENT_TYPES.find((t) => t.key === typeKey);
+      setRefreshing((r) => ({ ...r, [typeKey]: true }));
+      setLiveData((d) => ({ ...d, [typeKey]: { ...d[typeKey], status: 'loading' } }));
+      try {
+        const raw = await extractForecastFromUrl({
+          apiKey: settings.apiKey,
+          model: settings.model,
+          url: settings.websiteUrls[typeKey],
+          typeLabel: type.label,
+          hasDays: type.hasDays,
+        });
+        const items = normalizeSnapshot(raw, {
+          overrides: settings.fieldOverrides[typeKey],
+          includeInactive: settings.includeInactive,
+        });
+        applyItems(typeKey, items, raw);
+      } catch (error) {
+        setLiveData((d) => ({ ...d, [typeKey]: { status: 'error', items: [], error: error.message } }));
+      } finally {
+        setRefreshing((r) => ({ ...r, [typeKey]: false }));
+      }
+    },
+    [settings, applyItems]
+  );
 
   // Diagnostics: list the top-level keys actually in the database, so
   // mismatched paths in Settings are easy to spot.
@@ -39,9 +95,11 @@ export default function App() {
     return unsub;
   }, []);
 
-  // Subscribe live to every content type's Firebase path.
+  // Subscribe live to every Firebase-backed content type's path. Website-
+  // sourced types are fetched on demand instead (see refreshFromWebsite).
   useEffect(() => {
-    const unsubs = CONTENT_TYPES.map((type) =>
+    const firebaseTypes = CONTENT_TYPES.filter((t) => (settings.sourceModes[t.key] || 'firebase') === 'firebase');
+    const unsubs = firebaseTypes.map((type) =>
       watchPath(
         settings.paths[type.key],
         (raw, exists) => {
@@ -53,25 +111,7 @@ export default function App() {
             overrides: settings.fieldOverrides[type.key],
             includeInactive: settings.includeInactive,
           });
-          setLiveData((d) => ({
-            ...d,
-            [type.key]: { status: items.length ? 'ok' : 'empty', items, raw },
-          }));
-          setSelections((sel) => {
-            if (sel[type.key]?.itemId && items.some((i) => i.id === sel[type.key].itemId)) return sel;
-            const first = items[0];
-            if (!first) return sel;
-            return {
-              ...sel,
-              [type.key]: {
-                itemId: first.id,
-                regionIds: first.regions.filter((r) => r.active).map((r) => r.id),
-                dayIds: first.days.map((d) => d.id),
-                includeOverview: !!first.overview,
-                includeExtended: !!first.extendedOutlook,
-              },
-            };
-          });
+          applyItems(type.key, items, raw);
         },
         (error) => {
           setLiveData((d) => ({ ...d, [type.key]: { status: 'error', items: [], error: error.message } }));
@@ -79,8 +119,7 @@ export default function App() {
       )
     );
     return () => unsubs.forEach((u) => u && u());
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [settings.paths, settings.fieldOverrides, settings.includeInactive]);
+  }, [settings.paths, settings.fieldOverrides, settings.includeInactive, settings.sourceModes, applyItems]);
 
   const contentTypeLabels = useMemo(
     () => Object.fromEntries(CONTENT_TYPES.map((t) => [t.key, t.label])),
@@ -167,17 +206,28 @@ export default function App() {
             liveData={liveData}
             contentTypes={CONTENT_TYPES}
           />
-          {CONTENT_TYPES.map((type) => (
-            <ForecastTypePanel
-              key={type.key}
-              type={type}
-              liveState={liveData[type.key] || { status: 'loading', items: [] }}
-              enabled={!!enabledTypes[type.key]}
-              onToggleEnabled={(v) => setEnabledTypes((e) => ({ ...e, [type.key]: v }))}
-              selection={selections[type.key]}
-              onChangeSelection={(sel) => setSelections((s) => ({ ...s, [type.key]: sel }))}
-            />
-          ))}
+          {CONTENT_TYPES.map((type) => {
+            const sourceMode = settings.sourceModes[type.key] || 'firebase';
+            return (
+              <ForecastTypePanel
+                key={type.key}
+                type={type}
+                sourceMode={sourceMode}
+                liveState={liveData[type.key] || { status: 'loading', items: [] }}
+                enabled={!!enabledTypes[type.key]}
+                onToggleEnabled={(v) => {
+                  setEnabledTypes((e) => ({ ...e, [type.key]: v }));
+                  if (v && sourceMode === 'website' && liveData[type.key]?.status === 'idle') {
+                    refreshFromWebsite(type.key);
+                  }
+                }}
+                selection={selections[type.key]}
+                onChangeSelection={(sel) => setSelections((s) => ({ ...s, [type.key]: sel }))}
+                onRefresh={() => refreshFromWebsite(type.key)}
+                refreshing={!!refreshing[type.key]}
+              />
+            );
+          })}
         </section>
 
         <section className="column">
