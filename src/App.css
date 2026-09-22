@@ -374,6 +374,43 @@ body {
   gap: 10px;
 }
 
+.diagnostics-panel {
+  background: #fbfaf5;
+  border-color: #e8dfb8;
+}
+
+.diagnostics-toggle {
+  font-weight: 600;
+}
+
+.key-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  list-style: none;
+  padding: 0;
+  margin: 6px 0 12px;
+}
+
+.key-list li {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 3px 8px;
+}
+
+.raw-json {
+  background: #14181d;
+  color: #d7e2ea;
+  padding: 10px;
+  border-radius: 6px;
+  font-size: 0.78rem;
+  max-height: 260px;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
 .modal-actions {
   display: flex;
   justify-content: flex-end;

@@ -5,6 +5,7 @@ import { CONTENT_TYPES, loadSettings, saveSettings } from './lib/settings';
 import { buildPrompts } from './lib/buildPrompt';
 import { generatePost } from './lib/claude';
 import SettingsModal from './components/SettingsModal';
+import DiagnosticsPanel from './components/DiagnosticsPanel';
 import ForecastTypePanel from './components/ForecastTypePanel';
 import StyleControls from './components/StyleControls';
 import PostOutput from './components/PostOutput';
@@ -24,6 +25,19 @@ export default function App() {
   const [post, setPost] = useState('');
   const [generating, setGenerating] = useState(false);
   const [genError, setGenError] = useState('');
+  const [rootKeys, setRootKeys] = useState(null);
+  const [rootError, setRootError] = useState('');
+
+  // Diagnostics: list the top-level keys actually in the database, so
+  // mismatched paths in Settings are easy to spot.
+  useEffect(() => {
+    const unsub = watchPath(
+      '/',
+      (raw, exists) => setRootKeys(exists && raw && typeof raw === 'object' ? Object.keys(raw) : []),
+      (error) => setRootError(error.message)
+    );
+    return unsub;
+  }, []);
 
   // Subscribe live to every content type's Firebase path.
   useEffect(() => {
@@ -32,7 +46,7 @@ export default function App() {
         settings.paths[type.key],
         (raw, exists) => {
           if (!exists) {
-            setLiveData((d) => ({ ...d, [type.key]: { status: 'empty', items: [] } }));
+            setLiveData((d) => ({ ...d, [type.key]: { status: 'empty', items: [], raw: null } }));
             return;
           }
           const items = normalizeSnapshot(raw, {
@@ -41,7 +55,7 @@ export default function App() {
           });
           setLiveData((d) => ({
             ...d,
-            [type.key]: { status: items.length ? 'ok' : 'empty', items },
+            [type.key]: { status: items.length ? 'ok' : 'empty', items, raw },
           }));
           setSelections((sel) => {
             if (sel[type.key]?.itemId && items.some((i) => i.id === sel[type.key].itemId)) return sel;
@@ -135,6 +149,12 @@ export default function App() {
       <main className="app-main">
         <section className="column">
           <h2>1. Choose what to include</h2>
+          <DiagnosticsPanel
+            rootKeys={rootKeys}
+            rootError={rootError}
+            liveData={liveData}
+            contentTypes={CONTENT_TYPES}
+          />
           {CONTENT_TYPES.map((type) => (
             <ForecastTypePanel
               key={type.key}
