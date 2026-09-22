@@ -56,17 +56,36 @@ export async function extractForecastFromUrl({ apiKey, model, url, typeLabel, ha
     model,
     max_tokens: 4000,
     system: buildExtractionPrompt(typeLabel, hasDays),
-    tools: [{ type: 'web_fetch_20260209', name: 'web_fetch', max_uses: 3 }],
+    // Basic (non-dynamic-filtering) variant: a single direct fetch of the
+    // page, no code-execution container spun up — faster and simpler for
+    // "fetch one known page and extract it" than the _20260209 variant.
+    tools: [{ type: 'web_fetch_20250910', name: 'web_fetch', max_uses: 3 }],
   };
+  const REQUEST_TIMEOUT_MS = 90000;
 
   // A long-running server-tool turn can stop with stop_reason "pause_turn";
   // resume by feeding the assistant turn back until it finishes.
   for (let attempt = 0; attempt < 4; attempt++) {
-    const res = await fetch(API_URL, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({ ...body, messages }),
-    });
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+    let res;
+    try {
+      res = await fetch(API_URL, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ ...body, messages }),
+        signal: controller.signal,
+      });
+    } catch (err) {
+      if (err.name === 'AbortError') {
+        throw new Error(
+          `Timed out after ${REQUEST_TIMEOUT_MS / 1000}s waiting for Claude to fetch and read the page. Try again, or check the URL loads normally in a browser.`
+        );
+      }
+      throw new Error(`Network error reaching Claude's API: ${err.message}`);
+    } finally {
+      clearTimeout(timer);
+    }
 
     if (!res.ok) {
       let detail = '';

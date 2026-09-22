@@ -69,7 +69,7 @@ export default function ForecastTypePanel({
       {enabled && sourceMode === 'website' && (
         <div className="website-refresh-row">
           <button className="btn" onClick={onRefresh} disabled={refreshing}>
-            {refreshing ? 'Fetching from website…' : 'Refresh from website'}
+            {refreshing ? 'Fetching & reading the page… (can take up to a minute or two)' : 'Refresh from website'}
           </button>
         </div>
       )}
